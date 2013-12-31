@@ -1,0 +1,12 @@
+project("LuaInterface-Thread")
+	kind("SharedLib")
+	includedirs({"Source", LUA_INCLUDES, "Modules/Thread"})
+	files({"Modules/Thread/*.c", "Modules/Thread/*.cpp", "Modules/Thread/*.h", "Modules/Thread/*.hpp"})
+	vpaths({["Header files"] = {"**.h", "**.hpp"}, ["Source files"] = {"**.c", "**.cpp"}})
+	links({"LuaInterface"})
+	targetprefix("")
+	targetname("thread")
+	targetsuffix("")
+
+	configuration("not windows")
+		links({"pthread"})

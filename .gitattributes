@@ -1,0 +1,9 @@
+premake4win.exe binary
+premake4.bat text
+
+premake4nix binary
+premake4.sh text
+
+premake4mac binary
+
+Doxyfile text
