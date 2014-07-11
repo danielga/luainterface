@@ -259,7 +259,7 @@ static int l_pack(lua_State *L) 		/** pack(f,...) */
  return 1;
 }
 
-static const luaL_reg R[] =
+static const luaL_Reg R[] =
 {
 	{"pack",	l_pack},
 	{"unpack",	l_unpack},
@@ -272,7 +272,14 @@ LUAPACK_API int luaopen_pack(lua_State *L)
  lua_register(L,"bpack",l_pack);
  lua_register(L,"bunpack",l_unpack);
 #else
+#if LUA_VERSION_NUM > 501 && !defined(LUA_COMPAT_MODULE)
+ lua_pushglobaltable(L);
+ lua_pushstring(L,LUA_STRLIBNAME);
+ lua_rawget(L,-2);
+ luaL_setfuncs(L,R,0);
+#else
  luaL_openlib(L, LUA_STRLIBNAME, R, 0);
+#endif
 #endif
  return 0;
 }

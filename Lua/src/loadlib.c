@@ -1,5 +1,5 @@
 /*
-** $Id: loadlib.c,v 1.111 2012/05/30 12:33:44 roberto Exp $
+** $Id: loadlib.c,v 1.111.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Dynamic library loader for Lua
 ** See Copyright Notice in lua.h
 **
@@ -267,8 +267,8 @@ static void ll_addtoclib (lua_State *L, const char *path, void *plib) {
   lua_pop(L, 1);  /* pop CLIBS table */
 }
 
-LUA_API const char *luai_moduleloadfunc = 0;
-LUA_API const char *luai_moduleunloadfunc = 0;
+extern const char *luai_moduleloadfunc;
+extern const char *luai_moduleunloadfunc;
 
 /*
 ** __gc tag method for CLIBS table: calls 'll_unloadlib' for all lib
@@ -280,10 +280,8 @@ static int gctm (lua_State *L) {
     void *ud = NULL;
     lua_rawgeti(L, 1, n);  /* get handle CLIBS[n] */
     ud = lua_touserdata(L, -1);
-    if (luai_moduleunloadfunc) {
-      lua_CFunction f = ll_sym(L, ud, luai_moduleunloadfunc);
-      if (f) f(L);
-    }
+    lua_CFunction f = ll_sym(L, ud, luai_moduleunloadfunc);
+    if (f != NULL) f(L);
     ll_unloadlib(ud);
     lua_pop(L, 1);  /* pop handle */
   }
@@ -305,14 +303,9 @@ static int ll_loadfunc (lua_State *L, const char *path, const char *sym) {
   else {
     lua_CFunction f = ll_sym(L, reg, sym);
     if (f == NULL) {
-      if (luai_moduleloadfunc) {
-        f = ll_sym(L, reg, luai_moduleloadfunc);
-        if (f) {
-          lua_pushcfunction(L, f);
-          return 0;
-        }
-      }
-      return ERRFUNC;  /* unable to find function */
+      f = ll_sym(L, reg, luai_moduleloadfunc);
+      if (f == NULL)
+        return ERRFUNC;  /* unable to find function */
     }
     lua_pushcfunction(L, f);  /* else create new function */
     return 0;  /* no errors */

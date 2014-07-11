@@ -1,16 +1,16 @@
 project("LuaInterface-Socket")
 	kind("SharedLib")
-	includedirs({"Source", LUA_INCLUDES, "Modules/Socket"})
-	files({"Modules/Socket/*.c", "Modules/Socket/*.h"})
-	vpaths({["Header files"] = {"**.h"}, ["Source files"] = {"**.c"}})
+	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER, "./"})
+	files({"*.c", "*.h"})
+	vpaths({["Header files"] = "**.h", ["Source files"] = "**.c"})
 	links({"LuaInterface"})
 	if os.is("windows") then
-		includedirs({"Modules/Socket/windows"})
-		files({"Modules/Socket/windows/*.c", "Modules/Socket/windows/*.h"})
+		includedirs({"windows"})
+		files({"windows/*.c", "windows/*.h"})
 		links({"ws2_32"})
 	else
-		includedirs({"Modules/Socket/unix"})
-		files({"Modules/Socket/unix/*.c", "Modules/Socket/unix/*.h"})
+		includedirs({"unix"})
+		files({"unix/*.c", "unix/*.h"})
 	end
 	targetprefix("")
 	targetname("socket")

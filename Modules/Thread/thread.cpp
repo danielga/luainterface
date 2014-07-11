@@ -1,18 +1,20 @@
-extern "C"
-{
-	#include "lua.h"
-	#include "lauxlib.h"
-}
+#include <Lua/Interface.hpp>
 
-#include "LuaInterface.hpp"
-#ifdef _WIN32
+#if defined _WIN32
+
 #define WIN32_LEAN_AND_MEAN
+
 #include <windows.h>
+
 #undef LoadString
+
 #else
+
 #include <pthread.h>
+
 #endif
-#include <exception>
+
+#include <stdexcept>
 
 #define THREAD_TYPE "cthread"
 
@@ -30,23 +32,31 @@ public:
 		DETACHED
 	};
 
-	LuaThread( ) : thread( 0 ), references( 1 ), state( PENDING )
+	LuaThread( ) :
+		thread( 0 ),
+		references( 1 ),
+		state( PENDING )
 	{
-		LuaInterface *lua_interface = new LuaInterface;
+		Lua::Interface *lua_interface = new Lua::Interface;
 
 #if defined _WIN32
+
 		if( ( thread = CreateThread( 0, 0, &LuaThread::Callback, this, 0, 0 ) ) == 0 )
 		{
 			delete lua_interface;
-			throw std::exception( );
+			throw std::runtime_error( "Unable create new thread!" );
 		}
+
 #elif defined __APPLE__ || defined __linux
+
 		if( pthread_create( &thread, NULL, thread_callback, wrapper ) != 0 )
 		{
 			delete lua_interface;
-			throw std::exception( );
+			throw std::runtime_error( "Unable create new thread!" );
 		}
+
 #endif
+
 	}
 
 	~LuaThread( )
@@ -70,7 +80,9 @@ public:
 
 	bool Join( )
 	{
+
 #if defined _WIN32
+
 		if( GetCurrentThread( ) != thread && ( state == RUNNING || state == FINISHED ) )
 		{
 			state = JOINING;
@@ -79,7 +91,9 @@ public:
 			state = JOINED;
 			return true;
 		}
+
 #elif defined __APPLE__ || defined __linux
+
 		if( pthread_equal( pthread_self( ), thread ) == 0 && ( state == RUNNING || state == FINISHED ) )
 		{
 			state = JOINING;
@@ -87,6 +101,7 @@ public:
 			state = JOINED;
 			return true;
 		}
+
 #endif
 
 		return false;
@@ -97,11 +112,17 @@ public:
 		if( state == RUNNING )
 		{
 			state = DETACHING;
+
 #if defined _WIN32
+
 			CloseHandle( thread );
+
 #elif defined __APPLE__ || defined __linux
+
 			pthread_detach( thread );
+
 #endif
+
 			state = DETACHED;
 			return true;
 		}
@@ -110,10 +131,15 @@ public:
 	}
 
 #if defined _WIN32
+
 	static DWORD WINAPI Callback( void *userdata )
+
 #elif defined __APPLE__ || defined __linux
+
 	static void *Callback( void *userdata )
+
 #endif
+
 	{
 		LuaThread *thread = (LuaThread *)userdata;
 		thread->state = RUNNING;
@@ -129,47 +155,55 @@ public:
 		return 0;
 	}
 
-	LuaInterface *lua_interface;
+	Lua::Interface *lua_interface;
 	volatile State state;
 	volatile int references;
+
 #if defined _WIN32
+
 	HANDLE thread;
+
 #elif defined __APPLE__ || defined __linux
+
 	pthread_t thread;
+
 #endif
+
 };
 
-LUA_FUNCTION( thread_create )
+static int thread_create( lua_State *state )
 {
-	LUA->CheckType( 1, LUATYPE_STRING );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckType( 1, Lua::Type::String );
 
 	LuaThread *thread = new LuaThread;
 
-	const char *code = LUA->ToString( 1 );
+	const char *code = lua.ToString( 1 );
 	if( thread->lua_interface->LoadString( code ) != 0 )
 	{
-		LUA->PushString( thread->lua_interface->ToString( -1 ) );
+		lua.PushString( thread->lua_interface->ToString( -1 ) );
 		delete thread;
-		return LUA->Error( );
+		return lua.Error( );
 	}
 
-	LuaThread **userdata = (LuaThread **)LUA->NewUserdata( sizeof( LuaThread * ) );
+	LuaThread **userdata = (LuaThread **)lua.NewUserdata( sizeof( LuaThread * ) );
 	*userdata = thread;
 
-	LUA->NewMetatable( THREAD_TYPE );
-	LUA->SetMetaTable( -2 );
+	lua.NewMetatable( THREAD_TYPE );
+	lua.SetMetaTable( -2 );
 
 	return 1;
 }
 
-LUA_FUNCTION( thread_destroy )
+static int thread_destroy( lua_State *state )
 {
-	LUA->CheckUserdata( 1, THREAD_TYPE );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckUserdata( 1, THREAD_TYPE );
 
-	LuaThread **userdata = (LuaThread **)LUA->ToUserdata( 1 );
+	LuaThread **userdata = reinterpret_cast<LuaThread **>( lua.ToUserdata( 1 ) );
 	LuaThread *thread = *userdata;
 	if( thread == 0 )
-		return LUA->ArgError( 1, "invalid " THREAD_TYPE " object" );
+		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
 
 	thread->Release( );
 	*userdata = 0;
@@ -177,114 +211,120 @@ LUA_FUNCTION( thread_destroy )
 	return 1;
 }
 
-LUA_FUNCTION( thread_sleep )
+static int thread_sleep( lua_State *state )
 {
-	LUA->CheckType( 1, LUATYPE_NUMBER );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckType( 1, Lua::Type::Number );
 
-	unsigned int time = (unsigned int)LUA->ToNumber( 1 );
+	uint32_t time = static_cast<uint32_t>( lua.ToNumber( 1 ) );
 
 #if defined _WIN32
+
 	Sleep( time );
+
 #elif defined __APPLE__ || defined __linux
+
 	timespec newtime;
 	newtime.tv_sec = time / 1000;
 	newtime.tv_nsec = ( time % 1000 ) * 1000000;
 	clock_nanosleep( CLOCK_MONOTONIC, 0, &newtime, 0 );
+
 #endif
 
 	return 0;
 }
 
-LUA_FUNCTION( thread_join )
+static int thread_join( lua_State *state )
 {
-	LUA->CheckUserdata( 1, THREAD_TYPE );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckUserdata( 1, THREAD_TYPE );
 
-	LuaThread *thread = *(LuaThread **)LUA->ToUserdata( 1 );
+	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
 	if( thread == 0 )
-		return LUA->ArgError( 1, "invalid " THREAD_TYPE " object" );
+		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
 
 	thread->Join( );
 
 	return 0;
 }
 
-LUA_FUNCTION( thread_detach )
+static int thread_detach( lua_State *state )
 {
-	LUA->CheckUserdata( 1, THREAD_TYPE );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckUserdata( 1, THREAD_TYPE );
 
-	LuaThread *thread = *(LuaThread **)LUA->ToUserdata( 1 );
+	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
 	if( thread == 0 )
-		return LUA->ArgError( 1, "invalid " THREAD_TYPE " object" );
+		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
 
 	thread->Detach( );
 
 	return 0;
 }
 
-LUA_FUNCTION( thread_get )
+static int thread_get( lua_State *state )
 {
-	LUA->CheckUserdata( 1, THREAD_TYPE );
-	LUA->CheckAny( 2 );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckAny( 2 );
 
-	LuaThread *thread = *(LuaThread **)LUA->ToUserdata( 1 );
+	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
 	if( thread == 0 )
-		return LUA->ArgError( 1, "invalid " THREAD_TYPE " object" );
+		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
 
 
 
 	return 0;
 }
 
-LUA_FUNCTION( thread_set )
+static int thread_set( lua_State *state )
 {
-	LUA->CheckUserdata( 1, THREAD_TYPE );
-	LUA->CheckAny( 2 );
-	LUA->CheckAny( 3 );
+	Lua::Interface &lua = GetLuaInterface( state );
+	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckAny( 2 );
+	lua.CheckAny( 3 );
 
-	LuaThread *thread = *(LuaThread **)LUA->ToUserdata( 1 );
+	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
 	if( thread == 0 )
-		return LUA->ArgError( 1, "invalid " THREAD_TYPE " object" );
+		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
 
 
 
 	return 0;
 }
 
-LUA_MODULE_LOAD( )
+extern "C" int luaopen_thread( lua_State *state )
 {
-	LUA->CreateTable( );
+	Lua::Interface &lua = GetLuaInterface( state );
 
-	LUA->PushCFunction( thread_create );
-	LUA->SetField( -2, "create" );
+	lua.CreateTable( );
 
-	LUA->PushCFunction( thread_sleep );
-	LUA->SetField( -2, "sleep" );
+	lua.PushFunction( thread_create );
+	lua.SetField( -2, "create" );
 
-	LUA->NewMetatable( THREAD_TYPE );
+	lua.PushFunction( thread_sleep );
+	lua.SetField( -2, "sleep" );
 
-	LUA->CreateTable( );	// __metatable value
+	lua.NewMetatable( THREAD_TYPE );
 
-	LUA->PushCFunction( thread_join );
-	LUA->SetField( -2, "join" );
+	lua.CreateTable( );	// __metatable value
 
-	LUA->PushCFunction( thread_detach );
-	LUA->SetField( -2, "detach" );
+	lua.PushFunction( thread_join );
+	lua.SetField( -2, "join" );
 
-	LUA->PushCFunction( thread_get );
-	LUA->SetField( -2, "get" );
+	lua.PushFunction( thread_detach );
+	lua.SetField( -2, "detach" );
 
-	LUA->PushCFunction( thread_set );
-	LUA->SetField( -2, "set" );
+	lua.PushFunction( thread_get );
+	lua.SetField( -2, "get" );
 
-	LUA->PushCFunction( thread_destroy );
-	LUA->SetField( -2, "__gc" );
+	lua.PushFunction( thread_set );
+	lua.SetField( -2, "set" );
 
-	LUA->SetField( -2, "__metatable" );
+	lua.PushFunction( thread_destroy );
+	lua.SetField( -2, "__gc" );
+
+	lua.SetField( -2, "__metatable" );
 
 	return 1;
-}
-
-LUA_MODULE_UNLOAD( )
-{
-	return 0;
 }

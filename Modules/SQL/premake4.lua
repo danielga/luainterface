@@ -1,65 +1,69 @@
 project("LuaInterface-MySQL")
 	kind("SharedLib")
-	includedirs({"Source", LUA_INCLUDES, "Modules/SQL"})
-	files({"Modules/SQL/ls_mysql.c", "Modules/SQL/luasql.c", "Modules/SQL/luasql.h"})
-	vpaths({["Header files"] = {"**.h"}, ["Source files"] = {"**.c"}})
-	links({"LuaInterface"})
-	if os.is("windows") then
-		includedirs({"Modules/SQL/mysql/include"})
-		libdirs({"Modules/SQL/mysql/lib"})
-		links({"libmysql"})
-	else
-		-- So much differences between Linuxes... This tires me.
-		includedirs({"/usr/include/mysql"})
-		libdirs({"/usr/lib/mysql"})
-		links({"mysqlclient"})
-	end
+	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER})
+	files({"ls_mysql.c", "luasql.c", "luasql.h"})
+	vpaths({["Header files"] = "**.h", ["Source files"] = "**.c"})
+	links({"LuaInterface", "mysql"})
+
 	targetprefix("")
 	targetname("mysql")
 	targetsuffix("")
 
+	configuration({"windows", "x32"})
+		includedirs({"mysql/include"})
+		libdirs({"mysql/lib/x86"})
+
+	configuration({"windows", "x64"})
+		includedirs({"mysql/include"})
+		libdirs({"mysql/lib/x64"})
+
 project("LuaInterface-PgSQL")
 	kind("SharedLib")
-	includedirs({"Source", LUA_INCLUDES, "Modules/SQL"})
-	files({"Modules/SQL/ls_postgres.c", "Modules/SQL/luasql.c", "Modules/SQL/luasql.h"})
-	vpaths({["Header files"] = {"**.h"}, ["Source files"] = {"**.c"}})
-	links({"LuaInterface"})
-	if os.is("windows") then
-		includedirs({"Modules/SQL/pgsql/include"})
-		libdirs({"Modules/SQL/pgsql/lib"})
-		links({"libpq"})
-	else
-		-- So much differences between Linuxes... This tires me.
-		includedirs({"/usr/include/postgresql"})
-		links({"pq"})
-	end
+	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER})
+	files({"ls_postgres.c", "luasql.c", "luasql.h"})
+	vpaths({["Header files"] = "**.h", ["Source files"] = "**.c"})
+	links({"LuaInterface", "pq"})
+
 	targetprefix("")
 	targetname("postgres")
 	targetsuffix("")
 
+	configuration({"windows", "x32"})
+		includedirs({"pgsql/include"})
+		libdirs({"pgsql/lib/x86"})
+
+	configuration({"windows", "x64"})
+		includedirs({"pgsql/include"})
+		libdirs({"pgsql/lib/x64"})
+
 project("LuaInterface-SQLite")
 	kind("SharedLib")
-	includedirs({"Source", LUA_INCLUDES, "Modules/SQL", "Modules/SQL/sqlite"})
-	files({"Modules/SQL/ls_sqlite3.c", "Modules/SQL/luasql.c", "Modules/SQL/luasql.h", "Modules/SQL/sqlite/*.c", "Modules/SQL/sqlite/*.h"})
-	vpaths({["Header files"] = {"**.h"}, ["Source files"] = {"**.c"}})
+	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER, "sqlite"})
+	files({"ls_sqlite3.c", "luasql.c", "luasql.h", "sqlite/*.c", "sqlite/*.h"})
+	vpaths({["Header files"] = "**.h", ["Source files"] = "**.c"})
 	links({"LuaInterface"})
-	if not os.is("windows") then
-		links({"pthread"})
-	end
+
 	targetprefix("")
 	targetname("sqlite")
 	targetsuffix("")
 
+	configuration("not windows")
+		links({"pthread"})
+
 project("LuaInterface-ODBC")
 	kind("SharedLib")
-	includedirs({"Source", LUA_INCLUDES, "Modules/SQL"})
-	files({"Modules/SQL/ls_odbc.c", "Modules/SQL/luasql.c", "Modules/SQL/luasql.h"})
-	vpaths({["Header files"] = {"**.h"}, ["Source files"] = {"**.c"}})
+	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER})
+	files({"ls_odbc.c", "luasql.c", "luasql.h"})
+	vpaths({["Header files"] = "**.h", ["Source files"] = "**.c"})
 	links({"LuaInterface"})
-	if not os.is("windows") then
-		defines({"UNIXODBC"})
-		links({"odbc"})
-	end
+
 	targetprefix("")
 	targetname("odbc")
 	targetsuffix("")
+
+	configuration("windows")
+		links({"odbc32"})
+
+	configuration("not windows")
+		defines({"UNIXODBC"})
+		links({"odbc"})

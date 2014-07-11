@@ -12,7 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "libpq-fe.h"
+#include "postgresql/libpq-fe.h"
 
 #include "lua.h"
 #include "lauxlib.h"

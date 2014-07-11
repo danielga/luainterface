@@ -1,6 +1,6 @@
 /*
 ** State and stack handling.
-** Copyright (C) 2005-2013 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -258,8 +258,8 @@ LUA_API void lua_close(lua_State *L)
   close_state(L);
 }
 
-LUA_API void ( *luai_userstatethread ) ( lua_State *, lua_State * ) = 0;
-LUA_API void ( *luai_userstatefree ) ( lua_State *, lua_State * ) = 0;
+extern void ( *luai_userstatethread ) ( lua_State *, lua_State * );
+extern void ( *luai_userstatefree ) ( lua_State *, lua_State * );
 
 lua_State *lj_state_new(lua_State *L)
 {
@@ -274,7 +274,7 @@ lua_State *lj_state_new(lua_State *L)
   setgcrefnull(L1->openupval);
   setmrefr(L1->glref, L->glref);
   setgcrefr(L1->env, L->env);
-  if(luai_userstatethread) luai_userstatethread(L, L1);
+  luai_userstatethread(L, L1);
   stack_init(L1, L);  /* init stack */
   lua_assert(iswhite(obj2gco(L1)));
   return L1;
@@ -286,7 +286,7 @@ void LJ_FASTCALL lj_state_free(global_State *g, lua_State *L)
   lua_assert(L != gL);
   lj_func_closeuv(L, tvref(L->stack));
   lua_assert(gcref(L->openupval) == NULL);
-  if(luai_userstatefree) luai_userstatefree(gL, L);
+  luai_userstatefree(gL, L);
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
   lj_mem_freet(g, L);
 }

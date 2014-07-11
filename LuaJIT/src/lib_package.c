@@ -1,6 +1,6 @@
 /*
 ** Package library.
-** Copyright (C) 2005-2013 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2012 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -68,9 +68,6 @@ static const char *ll_bcsym(void *lib, const char *sym)
 #elif LJ_TARGET_WINDOWS
 
 #define WIN32_LEAN_AND_MEAN
-#ifndef WINVER
-#define WINVER 0x0500
-#endif
 #include <windows.h>
 
 #ifndef GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
@@ -209,8 +206,8 @@ static const char *mksymname(lua_State *L, const char *modname,
   return funcname;
 }
 
-LUA_API const char *luai_moduleloadfunc = 0;
-LUA_API const char *luai_moduleunloadfunc = 0;
+extern const char *luai_moduleloadfunc;
+extern const char *luai_moduleunloadfunc;
 
 static int ll_loadfunc(lua_State *L, const char *path, const char *name, int r)
 {
@@ -228,12 +225,10 @@ static int ll_loadfunc(lua_State *L, const char *path, const char *name, int r)
       lua_pushcfunction(L, f);
       return 0;
     }
-    if (luai_moduleloadfunc) {
-      f = ll_sym(L, *reg, luai_moduleloadfunc);
-      if (f) {
-        lua_pushcfunction(L, f);
-        return 0;
-      }
+    f = ll_sym(L, *reg, luai_moduleloadfunc);
+    if (f) {
+      lua_pushcfunction(L, f);
+      return 0;
     }
     if (!r) {
       const char *bcdata = ll_bcsym(*reg, mksymname(L, name, SYMPREFIX_BC));
@@ -266,13 +261,9 @@ static int lj_cf_package_loadlib(lua_State *L)
 static int lj_cf_package_unloadlib(lua_State *L)
 {
   void **lib = (void **)luaL_checkudata(L, 1, "_LOADLIB");
-  if (*lib)
-  {
-    if (luai_moduleunloadfunc)
-    {
-      lua_CFunction f = ll_sym(L, *lib, luai_moduleunloadfunc);
-      if (f) f(L);
-    }
+  if (*lib) {
+    lua_CFunction f = ll_sym(L, *lib, luai_moduleunloadfunc);
+    if (f) f(L);
     ll_unloadlib(*lib);
   }
   *lib = NULL;  /* mark library as closed */
