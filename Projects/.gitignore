@@ -1,4 +1,4 @@
 *
 !.gitignore
-!premake4.lua
+!premake5.lua
 !Doxygen

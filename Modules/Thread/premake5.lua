@@ -1,5 +1,5 @@
 project("LuaInterface-Thread")
-	flags({"ExtraWarnings"})
+	warnings("Extra")
 	kind("SharedLib")
 	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER})
 	files({"*.cpp", "*.hpp"})

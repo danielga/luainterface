@@ -1,5 +1,5 @@
 project("LuaInterface-ByteBuffer")
-	flags({"ExtraWarnings"})
+	warnings("Extra")
 	kind("SharedLib")
 	includedirs({INCLUDE_FOLDER, "./"})
 	files({"*.cpp"})
