@@ -1,4 +1,5 @@
 project("LuaInterface-Thread")
+	uuid("8c2c6a9b-830b-4fc1-bfb4-a041a3f7ed9d")
 	warnings("Extra")
 	kind("SharedLib")
 	includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER})
@@ -9,5 +10,5 @@ project("LuaInterface-Thread")
 	targetname("thread")
 	targetsuffix("")
 
-	configuration("not windows")
+	filter("system:not windows")
 		links({"pthread"})
