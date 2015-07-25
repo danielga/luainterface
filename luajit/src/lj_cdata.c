@@ -1,6 +1,6 @@
 /*
 ** C data management.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "lj_obj.h"
@@ -127,7 +127,8 @@ collect_attrib:
   integer_key:
     if (ctype_ispointer(ct->info)) {
       CTSize sz = lj_ctype_size(cts, ctype_cid(ct->info));  /* Element size. */
-      if (sz != CTSIZE_INVALID) {
+      if (sz == CTSIZE_INVALID)
+	lj_err_caller(cts->L, LJ_ERR_FFI_INVSIZE);
 	if (ctype_isptr(ct->info)) {
 	  p = (uint8_t *)cdata_getptr(p, ct->size);
 	} else if ((ct->info & (CTF_VECTOR|CTF_COMPLEX))) {
@@ -137,7 +138,6 @@ collect_attrib:
 	*pp = p + idx*(int32_t)sz;
 	return ct;
       }
-    }
   } else if (tviscdata(key)) {  /* Integer cdata key. */
     GCcdata *cdk = cdataV(key);
     CType *ctk = ctype_raw(cts, cdk->ctypeid);
