@@ -37,7 +37,7 @@ public:
 	 the stack.
 	 \details Because indices start at 1, this result is equal
 	 to the number of elements in the stack (and so 0
-	 means an empty stack). 
+	 means an empty stack).
 	 \return number of elements on the stack
 	 */
 	int GetTop( );
@@ -170,7 +170,7 @@ public:
 	/*!
 	 \brief Pops a table from the stack and sets it as the
 	 new metatable for the value at the given
-	 acceptable index. 
+	 acceptable index.
 	 \param stackpos position in stack of the table
 	 \return 1 if succeeded, 0 otherwise
 	 */
@@ -218,7 +218,7 @@ public:
 	 implementation, this index cannot be a pseudo-index.)
 	 In case of runtime errors, this function will be
 	 called with the error message and its return value
-	 will be the message returned on the stack by PCall. 
+	 will be the message returned on the stack by PCall.
 	 \sa Call()
 	 \param args number of arguments for the function
 	 \param results number of results retrieved from the function
@@ -262,7 +262,7 @@ public:
 	 \details After moving the top element to the provided
 	 index, it shifts up the elements above this index to
 	 open space. Cannot be called with a pseudo-index,
-	 because a pseudo-index is not an actual stack position. 
+	 because a pseudo-index is not an actual stack position.
 	 \param stackpos new position in stack for the value
 	 */
 	void Insert( int stackpos );
@@ -341,7 +341,7 @@ public:
 	 \brief If the function argument stackpos is a number,
 	 returns this number.
 	 \details If this argument is absent or is nil,
-	 returns def. Otherwise, raises an error. 
+	 returns def. Otherwise, raises an error.
 	 \param stackpos position in stack of the argument
 	 \param def default number
 	 \return number at the given index
@@ -411,7 +411,7 @@ public:
 	 \brief Grows the stack size a certain number of elements,
 	 raising an error if the stack cannot grow to that size.
 	 \details msg is an additional text to go into the error message.
-	 \param size number of stack positions to grow 
+	 \param size number of stack positions to grow
 	 \param msg additional text to go into the error message
 	 */
 	void CheckStack( int size, const char *msg );
@@ -539,7 +539,7 @@ public:
 	 \details The Lua value must be a number or
 	 a string convertible to a number. If the
 	 number is not an integer, it is truncated
-	 in some non-specified way. 
+	 in some non-specified way.
 	 \param stackpos stack index of the value
 	 \return number representation of the value in
 	 the stack, otherwise 0
@@ -593,7 +593,7 @@ public:
 	 \details This function allocates a new block of
 	 memory with the given size, pushes onto the
 	 stack a new full userdata with the block
-	 address, and returns this address. 
+	 address, and returns this address.
 	 \param size the size of the memory block
 	 \return memory block of the userdata
 	 */
@@ -609,7 +609,7 @@ public:
 	 stack.
 	 There is no explicit function to close or to destroy
 	 a thread. Threads are subject to garbage collection,
-	 like any Lua object. 
+	 like any Lua object.
 	 \return lua_State representing the new thread
 	 */
 	lua_State *NewThread( );
@@ -623,7 +623,7 @@ public:
 	 coroutine suspends its execution, and the call to Resume
 	 that started this coroutine returns. The parameter
 	 results is the number of values from the stack that are
-	 passed as results to Resume. 
+	 passed as results to Resume.
 	 \param results number of results to pass to Resume
 	 \return status code
 	 */
@@ -685,7 +685,7 @@ public:
 	char *BufferPrepare( Buffer *buffer );
 
 	/*!
-	 \brief Adds to the buffer a string of length size, 
+	 \brief Adds to the buffer a string of length size,
 	 previously copied to the buffer area.
 	 \param buffer Buffer struct previously
 	 initialized
@@ -743,7 +743,7 @@ public:
 	 \brief Creates a copy of the string by replacing
 	 any occurrence of the pattern with the replacement.
 	 \details Pushes the resulting string on the stack
-	 and returns it. 
+	 and returns it.
 	 \param str string to modify/copy
 	 \param pattern pattern of the substring to be modified
 	 \param replacement replacement for each match
@@ -884,7 +884,7 @@ public:
 	 argument vars telling how many values should
 	 be associated with the function. PushClosure
 	 also pops these values from the stack.
-	 The maximum value for vars is 255. 
+	 The maximum value for vars is 255.
 	 \sa Function
 	 \sa PushFunction()
 	 \param val function to be pushed
@@ -1131,23 +1131,23 @@ public:
 
 	/*!
 	 \brief Loads and runs a buffer as a Lua chunk.
-	 \details 
+	 \details
 	 \sa LoadBuffer()
 	 \param data buffer to be run as a Lua chunk
 	 \param size size in bytes of the buffer
 	 \param name name of the Lua chunk
 	 \param pcall run in protected mode
-	 \return 
+	 \return
 	 */
 	virtual bool RunBuffer( const char *data, size_t size, const char *name, bool pcall = true );
 
 	/*!
 	 \brief Loads and runs a string as a Lua chunk.
-	 \details 
+	 \details
 	 \sa LoadString()
 	 \param data string to be run
 	 \param pcall run in protected mode
-	 \return 
+	 \return
 	 */
 	virtual bool RunString( const char *data, bool pcall = true );
 

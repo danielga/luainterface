@@ -644,7 +644,7 @@ static int bytebuffer_readinteger( lua_State *state )
 			default:
 				return lua.ArgError( 2, "requested number of bytes to read not implemented (only 1, 2, 4 and 8 can be used)" );
 		}
-	
+
 	return 1;
 }
 
@@ -752,7 +752,7 @@ static int bytebuffer_writeinteger( lua_State *state )
 			default:
 				return lua.ArgError( 3, "requested number of bytes to read not implemented (only 1, 2, 4 and 8 can be used)" );
 		}
-	
+
 	return 0;
 }
 

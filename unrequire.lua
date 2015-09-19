@@ -6,11 +6,11 @@
 local function unrequire(m)
 	package.loaded[m] = nil
 	_G[m] = nil
-	 
+
 	-- Search for the shared library handle in the registry and erase it
 	local registry = debug.getregistry()
 	local nMatches, mKey, mt = 0, nil, registry["_LOADLIB"]
-	 
+
 	for key, ud in pairs(registry) do
 		if type(key) == "string" and string.find(key, "LOADLIB: .*" .. m) and type(ud) == "userdata" and getmetatable(ud) == mt then
 			nMatches = nMatches + 1
@@ -21,10 +21,10 @@ local function unrequire(m)
 			mKey = key
 		end
 	end
-	 
+
 	if mKey then
 		registry[mKey] = nil
 	end
-	 
+
 	return true
 end

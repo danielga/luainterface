@@ -82,33 +82,33 @@ solution("LuaInterface")
 		filter({"configurations:Debug", "platforms:x64"})
 			targetdir(PROJECT_FOLDER .. "/debug x64")
 
-	configuration("Static Release")
+	filter("configurations:StaticRelease")
 		kind("StaticLib")
 		optimize("On")
 		vectorextensions("SSE2")
 		objdir(PROJECT_FOLDER .. "/intermediate")
 
-		filter({"configurations:Static Release", "options:static-runtime"})
+		filter({"configurations:StaticRelease", "options:static-runtime"})
 			flags({"StaticRuntime"})
 
-		filter({"configurations:Static Release", "platforms:x86"})
+		filter({"configurations:StaticRelease", "platforms:x86"})
 			targetdir(PROJECT_FOLDER .. "/static release x86")
 
-		filter({"configurations:Static Release", "platforms:x64"})
+		filter({"configurations:StaticRelease", "platforms:x64"})
 			targetdir(PROJECT_FOLDER .. "/static release x64")
 
-	configuration("Static Debug")
+	filter("configurations:StaticDebug")
 		kind("StaticLib")
 		flags({"Symbols"})
 		objdir(PROJECT_FOLDER .. "/intermediate")
 
-		filter({"configurations:Static Debug", "options:static-runtime"})
+		filter({"configurations:StaticDebug", "options:static-runtime"})
 			flags({"StaticRuntime"})
 
-		filter({"configurations:Static Debug", "platforms:x86"})
+		filter({"configurations:StaticDebug", "platforms:x86"})
 			targetdir(PROJECT_FOLDER .. "/static debug x86")
 
-		filter({"configurations:Static Debug", "platforms:x64"})
+		filter({"configurations:StaticDebug", "platforms:x64"})
 			targetdir(PROJECT_FOLDER .. "/static debug x64")
 
 	project("LuaInterface Test")
@@ -123,13 +123,13 @@ solution("LuaInterface")
 		filter("system:not windows")
 			linkoptions({"-Wl,-R,./"})
 
-			filter({"system:not windows", "configurations:Static *", "platforms:x86"})
+			filter({"system:not windows", "configurations:Static*", "platforms:x86"})
 				if LUA_API == "luajit" then
 					libdirs({LIBS_FOLDER .. "/x86/static release"})
 				end
 				links(LIBS)
 
-			filter({"system:not windows", "configurations:Static *", "platforms:x64"})
+			filter({"system:not windows", "configurations:Static*", "platforms:x64"})
 				if LUA_API == "luajit" then
 					libdirs({LIBS_FOLDER .. "/x64/static release"})
 				end
@@ -143,13 +143,13 @@ solution("LuaInterface")
 		files({SOURCE_FOLDER .. "/*.cpp", INCLUDE_FOLDER .. "/*.hpp"})
 		vpaths({["Header files"] = "**.hpp", ["Source files"] = "**.cpp"})
 
-		filter({"configurations:not Static *", "platforms:x86"})
+		filter({"configurations:not Static*", "platforms:x86"})
 			if LUA_API == "luajit" then
 				libdirs({LIBS_FOLDER .. "/x86/static release"})
 			end
 			links(LIBS)
 
-		filter({"configurations:not Static *", "platforms:x64"})
+		filter({"configurations:not Static*", "platforms:x64"})
 			if LUA_API == "luajit" then
 				libdirs({LIBS_FOLDER .. "/x64/static release"})
 			end
