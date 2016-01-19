@@ -217,7 +217,7 @@ void Interface::GetUserValue( int stackpos )
 
 #if LUA_VERSION_NUM >= 502
 
-	lua_getuservalue( lua_state, stackpos );
+	lua_getuservalue( state_wrapper.get( ), stackpos );
 
 #else
 
@@ -233,7 +233,8 @@ int Interface::SetUserValue( int stackpos )
 
 #if LUA_VERSION_NUM >= 502
 
-	return lua_setuservalue( lua_state, stackpos );
+	lua_setuservalue( state_wrapper.get( ), stackpos );
+	return 1;
 
 #else
 
@@ -327,7 +328,17 @@ void Interface::CheckStack( int size, const char *msg )
 
 int Interface::Equal( int stackpos_a, int stackpos_b )
 {
+
+#if LUA_VERSION_NUM >= 502
+
+	return lua_compare( state_wrapper.get( ), stackpos_a, stackpos_b, LUA_OPEQ );
+
+#else
+
 	return lua_equal( state_wrapper.get( ), stackpos_a, stackpos_b );
+
+#endif
+
 }
 
 int Interface::RawEqual( int stackpos_a, int stackpos_b )
@@ -357,7 +368,17 @@ void Interface::RawSetI( int stackpos, int n )
 
 void Interface::Register( const char *libname, const ModuleFunction *list )
 {
+
+#if LUA_VERSION_NUM >= 502
+
+	
+
+#else
+
 	luaL_register( state_wrapper.get( ), libname, reinterpret_cast<const luaL_Reg *>( list ) );
+
+#endif
+
 }
 
 const char *Interface::ToString( int stackpos, size_t *outlen )
@@ -412,7 +433,17 @@ int Interface::Yield( int results )
 
 int Interface::Resume( int args )
 {
+
+#if LUA_VERSION_NUM >= 503
+
+	
+
+#else
+
 	return lua_resume( state_wrapper.get( ), args );
+
+#endif
+
 }
 
 int Interface::Status( )
@@ -539,7 +570,7 @@ void Interface::PushGlobal( )
 
 #if LUA_VERSION_NUM >= 502
 
-	lua_pushglobaltable( lua_state );
+	lua_pushglobaltable( state_wrapper.get( ) );
 
 #else
 
@@ -639,7 +670,7 @@ const char *Interface::Dump( size_t *outlen )
 	BufferInit( &buffer );
 
 	if( lua_dump( state_wrapper.get( ), FunctionDumper, &buffer ) == 0 )
-		return NULL;
+		return nullptr;
 
 	BufferFinish( &buffer );
 	return ToString( -1, outlen );
