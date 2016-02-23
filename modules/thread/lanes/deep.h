@@ -9,9 +9,24 @@
 
 #include "lua.h"
 
-typedef void (*luaG_IdFunction)( lua_State *L, char const * const which);
+#if (defined PLATFORM_WIN32) || (defined PLATFORM_POCKETPC)
+#define LANES_API __declspec(dllexport)
+#else
+#define LANES_API
+#endif // (defined PLATFORM_WIN32) || (defined PLATFORM_POCKETPC)
 
-int luaG_deep_userdata( lua_State *L, luaG_IdFunction idfunc);
-void *luaG_todeep( lua_State *L, luaG_IdFunction idfunc, int index);
+enum eDeepOp
+{
+	eDO_new,
+	eDO_delete,
+	eDO_metatable,
+	eDO_module,
+};
+
+typedef void* (*luaG_IdFunction)( lua_State* L, enum eDeepOp op_);
+
+extern LANES_API int luaG_newdeepuserdata( lua_State* L, luaG_IdFunction idfunc);
+extern LANES_API void* luaG_todeep( lua_State* L, luaG_IdFunction idfunc, int index);
+extern LANES_API void luaG_pushdeepversion( lua_State* L);
 
 #endif // __LANES_DEEP_H__

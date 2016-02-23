@@ -67,33 +67,16 @@ static int luasql_tostring (lua_State *L) {
 ** Adapted from Lua 5.2.0
 */
 void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
-	luaL_checkstack(L, nup, "too many upvalues");
+	luaL_checkstack(L, nup+1, "too many upvalues");
 	for (; l->name != NULL; l++) {	/* fill the table with given functions */
 		int i;
-		for (i = 0; i < nup; i++)	/* copy upvalues to the top */
-			lua_pushvalue(L, -nup);
 		lua_pushstring(L, l->name);
+		for (i = 0; i < nup; i++)	/* copy upvalues to the top */
+			lua_pushvalue(L, -(nup + 1));
 		lua_pushcclosure(L, l->func, nup);	/* closure with those upvalues */
 		lua_settable(L, -(nup + 3));
 	}
 	lua_pop(L, nup);	/* remove upvalues */
-}
-#endif
-
-#if !defined(LUA_VERSION_NUM)
-/*
-** Adapted from Lua 5.2.0
-*/
-LUALIB_API int luaL_newmetatable (lua_State *L, const char *tname) {
-	luaL_getmetatable(L, tname);  /* try to get metatable */
-	if (!lua_isnil(L, -1))  /* name already in use? */
-		return 0;  /* leave previous value on top, but return 0 */
-	lua_pop(L, 1);
-	lua_newtable(L);  /* create metatable */
-	lua_pushstring(L, tname);
-	lua_pushvalue(L, -1);
-	lua_settable(L, LUA_REGISTRYINDEX);
-	return 1;
 }
 #endif
 

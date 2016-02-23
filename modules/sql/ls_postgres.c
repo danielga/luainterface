@@ -12,7 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "postgresql/libpq-fe.h"
+#include "libpq-fe.h"
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -371,17 +371,14 @@ static int conn_escape (lua_State *L) {
 	conn_data *conn = getconnection (L);
 	size_t len;
 	const char *from = luaL_checklstring (L, 2, &len);
-	char *to = (char *)malloc(len*sizeof(char)*2+1);
+	char to[len*sizeof(char)*2+1];
 	int error;
 	len = PQescapeStringConn (conn->pg_conn, to, from, len, &error);
 	if (error == 0) { /* success ! */
 		lua_pushlstring (L, to, len);
-		free(to);
 		return 1;
-	} else {
-		free(to);
+	} else
 		return luasql_failmsg (L, "cannot escape string. PostgreSQL: ", PQerrorMessage (conn->pg_conn));
-	}
 }
 
 

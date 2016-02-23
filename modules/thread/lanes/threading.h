@@ -59,15 +59,24 @@ enum e_status { PENDING, RUNNING, WAITING, DONE, ERROR_ST, CANCELLED };
 */
 
 #if THREADAPI == THREADAPI_WINDOWS
-  #if defined ( PLATFORM_XBOX)
+  #if defined( PLATFORM_XBOX)
     #include <xtl.h>
   #else // !PLATFORM_XBOX
     #define WIN32_LEAN_AND_MEAN
-    // 'SignalObjectAndWait' needs this (targets Windows 2000 and above)
-    #define _WIN32_WINNT 0x0400
+    // CONDITION_VARIABLE needs version 0x0600+
+    // _WIN32_WINNT value is already defined by MinGW, but not by MSVC
+    #ifndef _WIN32_WINNT
+    #define _WIN32_WINNT 0x0600
+    #endif // _WIN32_WINNT
     #include <windows.h>
   #endif // !PLATFORM_XBOX
   #include <process.h>
+
+/*
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#pragma message( "The value of _WIN32_WINNT: " XSTR(_WIN32_WINNT))
+*/
 
   // MSDN: http://msdn2.microsoft.com/en-us/library/ms684254.aspx
   //
@@ -75,7 +84,8 @@ enum e_status { PENDING, RUNNING, WAITING, DONE, ERROR_ST, CANCELLED };
   // needed for use with the SIGNAL system.
   //
 
-	#if WINVER <= 0x0400 // Windows NT4: use a signal
+	#if _WIN32_WINNT < 0x0600 // CONDITION_VARIABLE aren't available, use a signal
+
 	typedef struct
 	{
 		CRITICAL_SECTION    signalCS;
@@ -92,7 +102,7 @@ enum e_status { PENDING, RUNNING, WAITING, DONE, ERROR_ST, CANCELLED };
 	void MUTEX_LOCK( MUTEX_T* ref);
 	void MUTEX_UNLOCK( MUTEX_T* ref);
 
-	#else // Vista and above: use a condition variable
+	#else // CONDITION_VARIABLE are available, use them
 
 	#define SIGNAL_T CONDITION_VARIABLE
 	#define MUTEX_T CRITICAL_SECTION
@@ -101,7 +111,7 @@ enum e_status { PENDING, RUNNING, WAITING, DONE, ERROR_ST, CANCELLED };
 	#define MUTEX_LOCK( ref) EnterCriticalSection( ref)
 	#define MUTEX_UNLOCK( ref) LeaveCriticalSection( ref)
 
-	#endif // // Vista and above
+	#endif // CONDITION_VARIABLE are available
 
   #define MUTEX_RECURSIVE_INIT(ref)  MUTEX_INIT(ref)  /* always recursive in Win32 */
 
@@ -111,7 +121,11 @@ enum e_status { PENDING, RUNNING, WAITING, DONE, ERROR_ST, CANCELLED };
 	#define THREAD_CALLCONV __stdcall
 #else // THREADAPI == THREADAPI_PTHREAD
   // PThread (Linux, OS X, ...)
-  //
+
+  // looks like some MinGW installations don't support PTW32_INCLUDE_WINDOWS_H, so let's include it ourselves, just in case
+  #if defined(PLATFORM_WIN32)
+  #include <windows.h>
+  #endif // PLATFORM_WIN32
   #include <pthread.h>
 
   #ifdef PLATFORM_LINUX
@@ -178,20 +192,25 @@ bool_t SIGNAL_WAIT( SIGNAL_T *ref, MUTEX_T *mu, time_d timeout );
 
 #if THREADAPI == THREADAPI_WINDOWS
 
-  typedef HANDLE THREAD_T;
-# define THREAD_ISNULL( _h) (_h == 0)
-  //
-  void THREAD_CREATE( THREAD_T *ref,
-                      THREAD_RETURN_T (__stdcall *func)( void * ),
-                      void *data, int prio /* -3..+3 */ );
+	typedef HANDLE THREAD_T;
+#	define THREAD_ISNULL( _h) (_h == 0)
+	void THREAD_CREATE( THREAD_T* ref, THREAD_RETURN_T (__stdcall *func)( void*), void* data, int prio /* -3..+3 */);
 
-# define THREAD_PRIO_MIN (-3)
-# define THREAD_PRIO_MAX (+3)
+#	define THREAD_PRIO_MIN (-3)
+#	define THREAD_PRIO_MAX (+3)
+
+#	define THREAD_CLEANUP_PUSH( cb_, val_)
+#	define THREAD_CLEANUP_POP( execute_)
 
 #else // THREADAPI == THREADAPI_PTHREAD
-    /* Platforms that have a timed 'pthread_join()' can get away with a simpler
-    * implementation. Others will use a condition variable.
-    */
+
+	/* Platforms that have a timed 'pthread_join()' can get away with a simpler
+	 * implementation. Others will use a condition variable.
+	 */
+#	if defined __WINPTHREADS_VERSION
+//#		define USE_PTHREAD_TIMEDJOIN
+#	endif // __WINPTHREADS_VERSION
+
 # ifdef USE_PTHREAD_TIMEDJOIN
 #  ifdef PLATFORM_OSX
 #   error "No 'pthread_timedjoin()' on this system"
@@ -201,25 +220,31 @@ bool_t SIGNAL_WAIT( SIGNAL_T *ref, MUTEX_T *mu, time_d timeout );
 #  endif
 # endif
 
-  typedef pthread_t THREAD_T;
-# define THREAD_ISNULL( _h) 0 // pthread_t may be a structure: never 'null' by itself
+	typedef pthread_t THREAD_T;
+#	define THREAD_ISNULL( _h) 0 // pthread_t may be a structure: never 'null' by itself
 
-  void THREAD_CREATE( THREAD_T *ref,
-                      THREAD_RETURN_T (*func)( void * ),
-                      void *data, int prio /* -2..+2 */ );
+	void THREAD_CREATE( THREAD_T* ref, THREAD_RETURN_T (*func)( void*), void* data, int prio /* -3..+3 */);
 
-# if defined(PLATFORM_LINUX)
-  volatile bool_t sudo;
-#  ifdef LINUX_SCHED_RR
-#   define THREAD_PRIO_MIN (sudo ? -2 : 0)
-#  else
-#   define THREAD_PRIO_MIN (0)
-#  endif
-# define THREAD_PRIO_MAX (sudo ? +2 : 0)
-# else
-#  define THREAD_PRIO_MIN (-2)
-#  define THREAD_PRIO_MAX (+2)
-# endif
+#	if defined(PLATFORM_LINUX)
+		extern volatile bool_t sudo;
+#		ifdef LINUX_SCHED_RR
+#			define THREAD_PRIO_MIN (sudo ? -3 : 0)
+#		else
+#			define THREAD_PRIO_MIN (0)
+#		endif
+#		define THREAD_PRIO_MAX (sudo ? +3 : 0)
+#	else
+#		define THREAD_PRIO_MIN (-3)
+#		define THREAD_PRIO_MAX (+3)
+#	endif
+
+#	if THREADWAIT_METHOD == THREADWAIT_CONDVAR
+#		define THREAD_CLEANUP_PUSH( cb_, val_) pthread_cleanup_push( cb_, val_)
+#		define THREAD_CLEANUP_POP( execute_) pthread_cleanup_pop( execute_)
+#	else
+#		define THREAD_CLEANUP_PUSH( cb_, val_) {
+#		define THREAD_CLEANUP_POP( execute_) }
+#	endif // THREADWAIT_METHOD == THREADWAIT_CONDVAR
 #endif // THREADAPI == THREADAPI_WINDOWS
 
 /*
@@ -244,7 +269,9 @@ bool_t THREAD_WAIT_IMPL( THREAD_T *ref, double secs, SIGNAL_T *signal_ref, MUTEX
 #define THREAD_WAIT THREAD_WAIT_IMPL
 #endif // // THREADWAIT_METHOD == THREADWAIT_CONDVAR
 
-void THREAD_KILL( THREAD_T *ref );
+void THREAD_KILL( THREAD_T* ref);
 void THREAD_SETNAME( char const* _name);
+void THREAD_MAKE_ASYNCH_CANCELLABLE();
+void THREAD_SET_PRIORITY( int prio);
 
 #endif // __threading_h__
