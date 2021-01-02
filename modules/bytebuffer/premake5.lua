@@ -1,7 +1,7 @@
 project("LuaInterface-ByteBuffer")
 	uuid("87808876-517a-4aeb-9897-9c062c58f9e6")
-	warnings("Extra")
 	kind("SharedLib")
+	defines("_CRT_SECURE_NO_WARNINGS")
 	includedirs({INCLUDE_FOLDER, "./"})
 	files("*.cpp")
 	vpaths({["Source files"] = "**.cpp"})

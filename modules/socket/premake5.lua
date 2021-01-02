@@ -29,7 +29,7 @@ project("LuaInterface-Mime")
 	targetname("mime.core")
 	targetsuffix("")
 
-if not os.is("windows") then
+if not os.istarget("windows") then
 	project("LuaInterface-Unix")
 		uuid("d3ec60af-109e-49e9-9a7b-901258521b9f")
 		kind("SharedLib")

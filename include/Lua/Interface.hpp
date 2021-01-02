@@ -27,6 +27,11 @@ public:
 	Interface( );
 
 	/*!
+	 \brief Destructor.
+	 */
+	virtual ~Interface( );
+
+	/*!
 	 \brief Returns the internal Lua state.
 	 \return internal Lua state
 	 */
@@ -357,7 +362,7 @@ public:
 	 \param def default number
 	 \return number at the given index
 	 */
-	ptrdiff_t OptionalInteger( int stackpos, ptrdiff_t def );
+	long long OptionalInteger( int stackpos, long long def );
 
 	/*!
 	 \brief Checks whether the function argument stackpos
@@ -388,7 +393,7 @@ public:
 	 \param stackpos position in stack of the argument
 	 \return number at the given stack position
 	 */
-	ptrdiff_t CheckInteger( int stackpos );
+	long long CheckInteger( int stackpos );
 
 	/*!
 	 \brief Checks whether the function argument stackpos
@@ -535,7 +540,7 @@ public:
 	/*!
 	 \brief Converts the Lua value at the given
 	 acceptable index to the signed integral
-	 type ptrdiff_t.
+	 type long long.
 	 \details The Lua value must be a number or
 	 a string convertible to a number. If the
 	 number is not an integer, it is truncated
@@ -544,7 +549,7 @@ public:
 	 \return number representation of the value in
 	 the stack, otherwise 0
 	 */
-	ptrdiff_t ToInteger( int stackpos );
+	long long ToInteger( int stackpos );
 
 	/*!
 	 \brief Converts the Lua value at the given
@@ -588,6 +593,23 @@ public:
 	void *ToUserdata( int stackpos );
 
 	/*!
+	 \brief Converts a value at the given
+	 acceptable index to a Lua userdata or
+	 light userdata.
+	 \details If the value is a full userdata,
+	 returns its block address. If the value
+	 is a light userdata, returns its pointer.
+	 Otherwise, returns NULL.
+	 \param stackpos stack index of the value
+	 \return Lua userdata representation of the value
+	 in the stack, otherwise NULL
+	*/
+	template<typename Type> Type *ToUserdata( int stackpos )
+	{
+		return static_cast<Type *>( ToUserdata( stackpos ) );
+	}
+
+	/*!
 	 \brief Creates a new userdata on the top of the
 	 stack.
 	 \details This function allocates a new block of
@@ -598,6 +620,21 @@ public:
 	 \return memory block of the userdata
 	 */
 	void *NewUserdata( size_t size );
+
+	/*!
+	 \brief Creates a new userdata on the top of the
+	 stack.
+	 \details This function allocates a new block of
+	 memory with the given size, pushes onto the
+	 stack a new full userdata with the block
+	 address, and returns this address.
+	 \param size the size of the memory block
+	 \return memory block of the userdata
+	*/
+	template<typename Type> Type *NewUserdata( size_t size )
+	{
+		return static_cast<Type *>( NewUserdata( size ) );
+	}
 
 	/*!
 	 \brief Creates a new thread, pushes it on the stack,
@@ -652,6 +689,28 @@ public:
 	int Resume( int args );
 
 	/*!
+	 \brief Starts and resumes a coroutine in a given thread.
+	 \details To start a coroutine, you first create a new
+	 thread (see NewThread); then you push onto its stack the
+	 main function plus any arguments; then you call Resume,
+	 with args being the number of arguments. This call returns
+	 when the coroutine suspends or finishes its execution.
+	 When it returns, the stack contains all values passed to
+	 Yield, or all values returned by the body function. Resume
+	 returns Status::Yield if the coroutine yields,
+	 Status::Success if the coroutine finishes its execution
+	 without errors, or an error code in case of errors (see
+	 PCall). In case of errors, the stack is not unwound, so
+	 you can use the debug API over it. The error message is
+	 on the top of the stack. To restart a coroutine, you put
+	 on its stack only the values to be passed as results from
+	 Yield, and then call Resume.
+	 \param args number of arguments to pop from stack
+	 \return status code
+	*/
+	int Resume( const Interface &from, int args );
+
+	/*!
 	 \brief Returns the status of the thread.
 	 \details The status can be 0 for a normal thread, an error
 	 code if the thread finished its execution with an error,
@@ -661,14 +720,12 @@ public:
 	int Status( );
 
 	/*!
-	 \brief Initializes a buffer.
-	 \details This function does not allocate
-	 any space; the buffer must be declared as
-	 a variable.
-	 \param buffer Buffer struct declared
-	 by the user
+	 \brief Allocates and initializes a buffer.
+	 \details Always call BufferFinish with the returned value
+	 to properly dispose of the memory allocated to it.
+	 \return Buffer struct
 	 */
-	void BufferInit( Buffer *buffer );
+	Buffer *BufferInit( );
 
 	/*!
 	 \brief Pushes all previous changes done to the
@@ -849,7 +906,7 @@ public:
 	 the stack.
 	 \param val number to be pushed
 	 */
-	void PushInteger( ptrdiff_t val );
+	void PushInteger( long long val );
 
 	/*!
 	 \brief Pushes a boolean with value val onto
@@ -1053,8 +1110,8 @@ public:
 	 \param error a string detailing the error
 	 \return this function does a long jump, and therefore
 	 never returns
-	 */
-	int ThrowError( const char *error );
+	*/
+	int ThrowError( const char *fmt, ... );
 
 	void SCall( )
 	{
@@ -1083,7 +1140,7 @@ public:
 		return SCall( args );
 	}
 
-	template<typename ...ArgsTypes> void SCall( ptrdiff_t arg, ArgsTypes... args )
+	template<typename ...ArgsTypes> void SCall( long long arg, ArgsTypes... args )
 	{
 		PushInteger( arg );
 		++pushed_scall;
@@ -1127,7 +1184,7 @@ public:
 	 \param outlen length of the returned binary chunk
 	 \return binary chunk representing the Lua function
 	 */
-	const char *Dump( size_t *outlen );
+	const char *Dump( size_t *outlen, bool strip = false );
 
 	/*!
 	 \brief Loads and runs a buffer as a Lua chunk.
@@ -1162,7 +1219,7 @@ public:
 	virtual bool RunFile( const char *path, bool pcall = true );
 
 private:
-	friend static void UserstateCreated( lua_State *state );
+	friend static void UserstateCreated( lua_State *global, lua_State *state );
 
 	/*!
 	 \brief Constructor.
@@ -1170,9 +1227,10 @@ private:
 	 independently then wrapping them with a LuaInterface.
 	 This is mostly for internal usage.
 	 */
-	Interface( lua_State *state );
+	Interface( lua_State *state, lua_State *global );
 
-	std::shared_ptr<lua_State> state_wrapper;
+	lua_State *lua_state;
+	lua_State *global_state;
 
 	int pushed_scall;
 };

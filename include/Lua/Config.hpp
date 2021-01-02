@@ -182,15 +182,9 @@ struct ModuleFunction
 static const size_t BufferSize = BUFSIZ;
 
 /*!
- \brief A struct that allows C code to build Lua strings.
+ \brief An opaque struct that allows C code to build Lua strings.
  */
-struct Buffer
-{
-	char *p;					///< current position in buffer
-	int lvl;					///< number of strings in the stack (level)
-	lua_State *L;				///< lua_State where strings are pushed
-	char buffer[BufferSize];	///< buffer for intermediate manipulations
-};
+struct Buffer;
 
 }
 

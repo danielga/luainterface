@@ -40,7 +40,7 @@ typedef unsigned char lu_byte;
 
 /* maximum size visible for Lua (must be representable in a lua_Integer */
 #define MAX_SIZE	(sizeof(size_t) < sizeof(lua_Integer) ? MAX_SIZET \
-                          : (size_t)(LUA_MAXINTEGER))
+                          : (size_t)(LUA_MAXINTEGER & MAX_SIZET))
 
 
 #define MAX_LUMEM	((lu_mem)(~(lu_mem)0))

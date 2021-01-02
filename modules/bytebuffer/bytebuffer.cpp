@@ -1,7 +1,8 @@
 #include <Lua/Interface.hpp>
 #include <stdint.h>
 #include <stddef.h>
-#include <cassert>
+#include <assert.h>
+#include <string.h>
 #include <vector>
 
 #if _WIN32
@@ -10,8 +11,8 @@
 
 #endif
 
-#define BYTEBUFFER_META "bytebuffer"
-#define GET_BYTEBUFFER( lua, index ) ( *reinterpret_cast<ByteBuffer *>( lua.ToUserdata( index ) ) )
+static const char metaname[] = "bytebuffer";
+static const char invalid_object[] = "failed to create new bytebuffer";
 
 enum SeekMode
 {
@@ -145,7 +146,7 @@ public:
 
 	void Assign( const uint8_t *copy_buffer, size_t size )
 	{
-		assert( copy_buffer != NULL && size != 0 );
+		assert( copy_buffer != nullptr && size != 0 );
 
 		buffer_internal.assign( copy_buffer, copy_buffer + size );
 		buffer_offset = 0;
@@ -154,7 +155,7 @@ public:
 
 	size_t Read( void *value, size_t size )
 	{
-		assert( value != NULL && size != 0 );
+		assert( value != nullptr && size != 0 );
 
 		if( buffer_offset >= buffer_internal.size( ) )
 		{
@@ -165,7 +166,7 @@ public:
 		size_t clamped = buffer_internal.size( ) - buffer_offset;
 		if( clamped > size )
 			clamped = size;
-		std::memcpy( value, &buffer_internal[buffer_offset], clamped );
+		memcpy( value, &buffer_internal[buffer_offset], clamped );
 		buffer_offset += clamped;
 		if( clamped < size )
 			end_of_file = true;
@@ -175,12 +176,12 @@ public:
 
 	size_t Write( const void *value, size_t size )
 	{
-		assert( value != NULL && size != 0 );
+		assert( value != nullptr && size != 0 );
 
 		if( buffer_internal.size( ) < buffer_offset + size )
 			Resize( buffer_offset + size );
 
-		std::memcpy( &buffer_internal[buffer_offset], value, size );
+		memcpy( &buffer_internal[buffer_offset], value, size );
 		buffer_offset += size;
 		return size;
 	}
@@ -295,7 +296,7 @@ public:
 
 	ByteBuffer &operator>>( char *data )
 	{
-		assert( data != NULL );
+		assert( data != nullptr );
 
 		char ch = 0;
 		size_t offset = 0;
@@ -332,7 +333,7 @@ public:
 
 	ByteBuffer &operator>>( wchar_t *data )
 	{
-		assert( data != NULL );
+		assert( data != nullptr );
 
 		wchar_t ch = 0;
 		size_t offset = 0;
@@ -432,9 +433,9 @@ public:
 
 	ByteBuffer &operator<<( const char *data )
 	{
-		assert( data != NULL );
+		assert( data != nullptr );
 
-		Write( data, ( std::strlen( data ) + 1 ) * sizeof( char ) );
+		Write( data, ( strlen( data ) + 1 ) * sizeof( char ) );
 		return *this;
 	}
 
@@ -452,9 +453,9 @@ public:
 
 	ByteBuffer &operator<<( const wchar_t *data )
 	{
-		assert( data != NULL );
+		assert( data != nullptr );
 
-		Write( data, ( std::wcslen( data ) + 1 ) * sizeof( wchar_t ) );
+		Write( data, ( wcslen( data ) + 1 ) * sizeof( wchar_t ) );
 		return *this;
 	}
 
@@ -470,91 +471,93 @@ private:
 	size_t buffer_offset;
 };
 
-static int bytebuffer_new( lua_State *state )
+namespace bytebuffer
 {
-	Lua::Interface &lua = GetLuaInterface( state );
-	ByteBuffer *buffer = reinterpret_cast<ByteBuffer *>( lua.NewUserdata( sizeof( ByteBuffer ) ) );
-	if( buffer == NULL )
-		lua.ThrowError( "failed to create new " BYTEBUFFER_META );
-
-	new( buffer ) ByteBuffer( );
-
-	lua.NewMetatable( BYTEBUFFER_META );
-	lua.SetMetaTable( -2 );
-
-	lua.CreateTable( );
-	lua.SetUserValue( -2 );
-
-	if( lua.GetType( 1 ) == Lua::Type::String )
+	static int create( lua_State *state )
 	{
-		size_t size = 0;
-		const uint8_t *data = reinterpret_cast<const uint8_t *>( lua.ToString( 1, &size ) );
-		buffer->Assign( data, size );
+		Lua::Interface &lua = GetLuaInterface( state );
+		ByteBuffer *buffer = reinterpret_cast<ByteBuffer *>( lua.NewUserdata( sizeof( ByteBuffer ) ) );
+		if( buffer == nullptr )
+			lua.ThrowError( invalid_object );
+
+		new( buffer ) ByteBuffer( );
+
+		lua.NewMetatable( metaname );
+		lua.SetMetaTable( -2 );
+
+		lua.CreateTable( );
+		lua.SetUserValue( -2 );
+
+		if( lua.GetType( 1 ) == Lua::Type::String )
+		{
+			size_t size = 0;
+			const uint8_t *data = reinterpret_cast<const uint8_t *>( lua.ToString( 1, &size ) );
+			buffer->Assign( data, size );
+		}
+
+		return 1;
 	}
 
-	return 1;
-}
+	static int destroy( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.ToUserdata<ByteBuffer>( 1 )->~ByteBuffer( );
+		return 0;
+	}
 
-static int bytebuffer_delete( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	GET_BYTEBUFFER( lua, 1 ).~ByteBuffer( );
-	return 0;
-}
-
-static int bytebuffer_tostring( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	char msg[30];
-	snprintf( msg, sizeof( msg ), "%s: 0x%p", BYTEBUFFER_META, GET_BYTEBUFFER( lua, 1 ) );
-	lua.PushString( msg );
-	return 1;
-}
-
-static int bytebuffer_index( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-
-	lua.GetUserValue( 1 );
-	lua.PushValue( 2 );
-	lua.RawGet( -2 );
-
-	if( lua.GetType( -1 ) > Lua::Type::Nil )
+	static int tostring( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		char msg[30];
+		snprintf( msg, sizeof( msg ), "%s: 0x%p", metaname, lua.ToUserdata<ByteBuffer>( 1 ) );
+		lua.PushString( msg );
 		return 1;
+	}
 
-	lua.Pop( 2 );
+	static int index( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
 
-	lua.GetMetaTable( 1 );
-	lua.PushValue( 2 );
-	lua.RawGet( -2 );
+		lua.GetUserValue( 1 );
+		lua.PushValue( 2 );
+		lua.RawGet( -2 );
 
-	return 1;
-}
+		if( lua.GetType( -1 ) > Lua::Type::Nil )
+			return 1;
 
-static int bytebuffer_newindex( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.GetUserValue( 1 );
-	lua.PushValue( 2 );
-	lua.PushValue( 3 );
-	lua.RawSet( -3 );
-	return 0;
-}
+		lua.Pop( 2 );
 
-static int bytebuffer_readinteger( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
+		lua.GetMetaTable( 1 );
+		lua.PushValue( 2 );
+		lua.RawGet( -2 );
 
-	ByteBuffer &buffer = GET_BYTEBUFFER( lua, 1 );
-	if( lua.IsType( 3, Lua::Type::Boolean ) && lua.ToBoolean( 3 ) )
-		switch( static_cast<int32_t>( lua.ToNumber( 2 ) ) )
-		{
+		return 1;
+	}
+
+	static int newindex( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.GetUserValue( 1 );
+		lua.PushValue( 2 );
+		lua.PushValue( 3 );
+		lua.RawSet( -3 );
+		return 0;
+	}
+
+	static int readinteger( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+
+		ByteBuffer &buffer = *lua.ToUserdata<ByteBuffer>( 1 );
+		if( lua.IsType( 3, Lua::Type::Boolean ) && lua.ToBoolean( 3 ) )
+			switch( static_cast<int32_t>( lua.ToNumber( 2 ) ) )
+			{
 			case 1:
 			{
 				uint8_t number;
@@ -597,10 +600,10 @@ static int bytebuffer_readinteger( lua_State *state )
 
 			default:
 				return lua.ArgError( 2, "requested number of bytes to read not implemented (only 1, 2, 4 and 8 can be used)" );
-		}
-	else
-		switch( static_cast<int32_t>( lua.ToNumber( 2 ) ) )
-		{
+			}
+		else
+			switch( static_cast<int32_t>( lua.ToNumber( 2 ) ) )
+			{
 			case 1:
 			{
 				int8_t number;
@@ -643,74 +646,74 @@ static int bytebuffer_readinteger( lua_State *state )
 
 			default:
 				return lua.ArgError( 2, "requested number of bytes to read not implemented (only 1, 2, 4 and 8 can be used)" );
-		}
+			}
 
-	return 1;
-}
+		return 1;
+	}
 
-static int bytebuffer_readfloat( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
+	static int readfloat( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
 
-	float number;
-	if( !( GET_BYTEBUFFER( lua, 1 ) >> number ) )
-		return 0;
+		float number;
+		if( !( *lua.ToUserdata<ByteBuffer>( 1 ) >> number ) )
+			return 0;
 
-	lua.PushNumber( number );
-	return 1;
-}
+		lua.PushNumber( number );
+		return 1;
+	}
 
-static int bytebuffer_readdouble( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
+	static int readdouble( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
 
-	double number;
-	if( !( GET_BYTEBUFFER( lua, 1 ) >> number ) )
-		return 0;
+		double number;
+		if( !( *lua.ToUserdata<ByteBuffer>( 1 ) >> number ) )
+			return 0;
 
-	lua.PushNumber( number );
-	return 1;
-}
+		lua.PushNumber( number );
+		return 1;
+	}
 
-static int bytebuffer_readbool( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
+	static int readbool( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
 
-	bool number;
-	if( !( GET_BYTEBUFFER( lua, 1 ) >> number ) )
-		return 0;
+		bool number;
+		if( !( *lua.ToUserdata<ByteBuffer>( 1 ) >> number ) )
+			return 0;
 
-	lua.PushNumber( number );
-	return 1;
-}
+		lua.PushNumber( number );
+		return 1;
+	}
 
-static int bytebuffer_readstring( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
+	static int readstring( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
 
-	std::string str;
-	if( !( GET_BYTEBUFFER( lua, 1 ) >> str ) )
-		return 0;
+		std::string str;
+		if( !( *lua.ToUserdata<ByteBuffer>( 1 ) >> str ) )
+			return 0;
 
-	lua.PushString( str.c_str( ), str.size( ) );
-	return 1;
-}
+		lua.PushString( str.c_str( ), str.size( ) );
+		return 1;
+	}
 
-static int bytebuffer_writeinteger( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	lua.CheckType( 3, Lua::Type::Number );
+	static int writeinteger( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		lua.CheckType( 3, Lua::Type::Number );
 
-	ByteBuffer &buffer = GET_BYTEBUFFER( lua, 1 );
-	if( lua.IsType( 4, Lua::Type::Boolean ) && lua.ToBoolean( 4 ) )
-		switch( static_cast<int32_t>( lua.ToNumber( 3 ) ) )
-		{
+		ByteBuffer &buffer = *lua.ToUserdata<ByteBuffer>( 1 );
+		if( lua.IsType( 4, Lua::Type::Boolean ) && lua.ToBoolean( 4 ) )
+			switch( static_cast<int32_t>( lua.ToNumber( 3 ) ) )
+			{
 			case 1:
 				buffer << static_cast<const uint8_t>( lua.ToNumber( 2 ) );
 				break;
@@ -729,10 +732,10 @@ static int bytebuffer_writeinteger( lua_State *state )
 
 			default:
 				return lua.ArgError( 3, "requested number of bytes to read not implemented (only 1, 2, 4 and 8 can be used)" );
-		}
-	else
-		switch( static_cast<int32_t>( lua.ToNumber( 3 ) ) )
-		{
+			}
+		else
+			switch( static_cast<int32_t>( lua.ToNumber( 3 ) ) )
+			{
 			case 1:
 				buffer << static_cast<const int8_t>( lua.ToNumber( 2 ) );
 				break;
@@ -751,234 +754,235 @@ static int bytebuffer_writeinteger( lua_State *state )
 
 			default:
 				return lua.ArgError( 3, "requested number of bytes to read not implemented (only 1, 2, 4 and 8 can be used)" );
-		}
+			}
 
-	return 0;
-}
+		return 0;
+	}
 
-static int bytebuffer_writefloat( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	GET_BYTEBUFFER( lua, 1 ) << static_cast<float>( lua.ToNumber( 2 ) );
-	return 0;
-}
+	static int writefloat( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		*lua.ToUserdata<ByteBuffer>( 1 ) << static_cast<float>( lua.ToNumber( 2 ) );
+		return 0;
+	}
 
-static int bytebuffer_writedouble( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	GET_BYTEBUFFER( lua, 1 ) << lua.ToNumber( 2 );
-	return 0;
-}
+	static int writedouble( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		*lua.ToUserdata<ByteBuffer>( 1 ) << lua.ToNumber( 2 );
+		return 0;
+	}
 
-static int bytebuffer_writebool( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Boolean );
-	GET_BYTEBUFFER( lua, 1 ) << ( lua.ToBoolean( 2 ) == 1 );
-	return 0;
-}
+	static int writebool( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Boolean );
+		*lua.ToUserdata<ByteBuffer>( 1 ) << ( lua.ToBoolean( 2 ) == 1 );
+		return 0;
+	}
 
-static int bytebuffer_writestring( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::String );
-	GET_BYTEBUFFER( lua, 1 ) << lua.ToString( 2 );
-	return 0;
-}
+	static int writestring( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::String );
+		*lua.ToUserdata<ByteBuffer>( 1 ) << lua.ToString( 2 );
+		return 0;
+	}
 
-static int bytebuffer_assign( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::String );
-	size_t len = 0;
-	const uint8_t *data = reinterpret_cast<const uint8_t *>( lua.ToString( 2, &len ) );
-	GET_BYTEBUFFER( lua, 1 ).Assign( data, len );
-	return 0;
-}
+	static int assign( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::String );
+		size_t len = 0;
+		const uint8_t *data = reinterpret_cast<const uint8_t *>( lua.ToString( 2, &len ) );
+		lua.ToUserdata<ByteBuffer>( 1 )->Assign( data, len );
+		return 0;
+	}
 
-static int bytebuffer_reserve( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	GET_BYTEBUFFER( lua, 1 ).Reserve( static_cast<size_t>( lua.ToNumber( 2 ) ) );
-	return 0;
-}
+	static int reserve( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		lua.ToUserdata<ByteBuffer>( 1 )->Reserve( static_cast<size_t>( lua.ToNumber( 2 ) ) );
+		return 0;
+	}
 
-static int bytebuffer_resize( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::String );
-	GET_BYTEBUFFER( lua, 1 ).Resize( static_cast<size_t>( lua.ToNumber( 2 ) ) );
-	return 0;
-}
+	static int resize( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::String );
+		lua.ToUserdata<ByteBuffer>( 1 )->Resize( static_cast<size_t>( lua.ToNumber( 2 ) ) );
+		return 0;
+	}
 
-static int bytebuffer_clear( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	GET_BYTEBUFFER( lua, 1 ).Clear( );
-	return 0;
-}
+	static int clear( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.ToUserdata<ByteBuffer>( 1 )->Clear( );
+		return 0;
+	}
 
-static int bytebuffer_tell( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.PushNumber( GET_BYTEBUFFER( lua, 1 ).Tell( ) );
-	return 1;
-}
+	static int tell( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.PushNumber( lua.ToUserdata<ByteBuffer>( 1 )->Tell( ) );
+		return 1;
+	}
 
-static int bytebuffer_size( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.PushNumber( GET_BYTEBUFFER( lua, 1 ).Size( ) );
-	return 1;
-}
+	static int size( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.PushNumber( lua.ToUserdata<ByteBuffer>( 1 )->Size( ) );
+		return 1;
+	}
 
-static int bytebuffer_capacity( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.PushNumber( GET_BYTEBUFFER( lua, 1 ).Capacity( ) );
-	return 1;
-}
+	static int capacity( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.PushNumber( lua.ToUserdata<ByteBuffer>( 1 )->Capacity( ) );
+		return 1;
+	}
 
-static int bytebuffer_shrinktofit( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	GET_BYTEBUFFER( lua, 1 ).ShrinkToFit( );
-	return 0;
-}
+	static int shrinktofit( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.ToUserdata<ByteBuffer>( 1 )->ShrinkToFit( );
+		return 0;
+	}
 
-static int bytebuffer_seek( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	lua.PushNumber( GET_BYTEBUFFER( lua, 1 ).Seek( static_cast<int32_t>( lua.ToNumber( 2 ) ) ) );
-	return 1;
-}
+	static int seek( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		lua.PushNumber( lua.ToUserdata<ByteBuffer>( 1 )->Seek( static_cast<int32_t>( lua.ToNumber( 2 ) ) ) );
+		return 1;
+	}
 
-static int bytebuffer_isvalid( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	lua.PushBoolean( GET_BYTEBUFFER( lua, 1 ).IsValid( ) );
-	return 1;
-}
+	static int isvalid( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		lua.PushBoolean( lua.ToUserdata<ByteBuffer>( 1 )->IsValid( ) );
+		return 1;
+	}
 
-static int bytebuffer_eof( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	lua.CheckType( 2, Lua::Type::Number );
-	lua.PushBoolean( GET_BYTEBUFFER( lua, 1 ).EndOfFile( ) );
-	return 1;
-}
+	static int eof( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		lua.CheckType( 2, Lua::Type::Number );
+		lua.PushBoolean( lua.ToUserdata<ByteBuffer>( 1 )->EndOfFile( ) );
+		return 1;
+	}
 
-static int bytebuffer_getbuffer( lua_State *state )
-{
-	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, BYTEBUFFER_META );
-	ByteBuffer &buffer = GET_BYTEBUFFER( lua, 1 );
-	lua.PushString( reinterpret_cast<const char *>( buffer.GetBuffer( ) ), buffer.Size( ) );
-	return 1;
+	static int getbuffer( lua_State *state )
+	{
+		Lua::Interface &lua = GetLuaInterface( state );
+		lua.CheckUserdata( 1, metaname );
+		ByteBuffer &buffer = *lua.ToUserdata<ByteBuffer>( 1 );
+		lua.PushString( reinterpret_cast<const char *>( buffer.GetBuffer( ) ), buffer.Size( ) );
+		return 1;
+	}
 }
 
 extern "C" int luaopen_bytebuffer( lua_State *state )
 {
 	Lua::Interface &lua = GetLuaInterface( state );
 
-	lua.NewMetatable( BYTEBUFFER_META );
+	lua.NewMetatable( metaname );
 
-	lua.PushFunction( bytebuffer_readinteger );
+	lua.PushFunction( bytebuffer::readinteger );
 	lua.SetField( -2, "readinteger" );
 
-	lua.PushFunction( bytebuffer_readfloat );
+	lua.PushFunction( bytebuffer::readfloat );
 	lua.SetField( -2, "readfloat" );
 
-	lua.PushFunction( bytebuffer_readdouble );
+	lua.PushFunction( bytebuffer::readdouble );
 	lua.SetField( -2, "readdouble" );
 
-	lua.PushFunction( bytebuffer_readbool );
+	lua.PushFunction( bytebuffer::readbool );
 	lua.SetField( -2, "readbool" );
 
-	lua.PushFunction( bytebuffer_readstring );
+	lua.PushFunction( bytebuffer::readstring );
 	lua.SetField( -2, "readstring" );
 
-	lua.PushFunction( bytebuffer_writeinteger );
+	lua.PushFunction( bytebuffer::writeinteger );
 	lua.SetField( -2, "writeinteger" );
 
-	lua.PushFunction( bytebuffer_writefloat );
+	lua.PushFunction( bytebuffer::writefloat );
 	lua.SetField( -2, "writefloat" );
 
-	lua.PushFunction( bytebuffer_writedouble );
+	lua.PushFunction( bytebuffer::writedouble );
 	lua.SetField( -2, "writedouble" );
 
-	lua.PushFunction( bytebuffer_writebool );
+	lua.PushFunction( bytebuffer::writebool );
 	lua.SetField( -2, "writebool" );
 
-	lua.PushFunction( bytebuffer_writestring );
+	lua.PushFunction( bytebuffer::writestring );
 	lua.SetField( -2, "writestring" );
 
-	lua.PushFunction( bytebuffer_assign );
+	lua.PushFunction( bytebuffer::assign );
 	lua.SetField( -2, "assign" );
 
-	lua.PushFunction( bytebuffer_reserve );
+	lua.PushFunction( bytebuffer::reserve );
 	lua.SetField( -2, "reserve" );
 
-	lua.PushFunction( bytebuffer_resize );
+	lua.PushFunction( bytebuffer::resize );
 	lua.SetField( -2, "resize" );
 
-	lua.PushFunction( bytebuffer_clear );
+	lua.PushFunction( bytebuffer::clear );
 	lua.SetField( -2, "clear" );
 
-	lua.PushFunction( bytebuffer_tell );
+	lua.PushFunction( bytebuffer::tell );
 	lua.SetField( -2, "tell" );
 
-	lua.PushFunction( bytebuffer_size );
+	lua.PushFunction( bytebuffer::size );
 	lua.SetField( -2, "size" );
 
-	lua.PushFunction( bytebuffer_capacity );
+	lua.PushFunction( bytebuffer::capacity );
 	lua.SetField( -2, "capacity" );
 
-	lua.PushFunction( bytebuffer_shrinktofit );
+	lua.PushFunction( bytebuffer::shrinktofit );
 	lua.SetField( -2, "shrinktofit" );
 
-	lua.PushFunction( bytebuffer_seek );
+	lua.PushFunction( bytebuffer::seek );
 	lua.SetField( -2, "seek" );
 
-	lua.PushFunction( bytebuffer_isvalid );
+	lua.PushFunction( bytebuffer::isvalid );
 	lua.SetField( -2, "isvalid" );
 
-	lua.PushFunction( bytebuffer_eof );
+	lua.PushFunction( bytebuffer::eof );
 	lua.SetField( -2, "eof" );
 
-	lua.PushFunction( bytebuffer_getbuffer );
+	lua.PushFunction( bytebuffer::getbuffer );
 	lua.SetField( -2, "getbuffer" );
 
-	lua.PushFunction( bytebuffer_delete );
+	lua.PushFunction( bytebuffer::destroy );
 	lua.SetField( -2, "__gc" );
 
-	lua.PushFunction( bytebuffer_tostring );
+	lua.PushFunction( bytebuffer::tostring );
 	lua.SetField( -2, "__tostring" );
 
-	lua.PushFunction( bytebuffer_index );
+	lua.PushFunction( bytebuffer::index );
 	lua.SetField( -2, "__index" );
 
-	lua.PushFunction( bytebuffer_newindex );
+	lua.PushFunction( bytebuffer::newindex );
 	lua.SetField( -2, "__newindex" );
 
 	lua.PushValue( -1 );
@@ -986,6 +990,6 @@ extern "C" int luaopen_bytebuffer( lua_State *state )
 
 	lua.Pop( 1 );
 
-	lua.PushFunction( bytebuffer_new );
+	lua.PushFunction( bytebuffer::create );
 	return 1;
 }

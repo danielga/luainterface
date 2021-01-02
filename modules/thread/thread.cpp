@@ -16,7 +16,8 @@
 
 #include <stdexcept>
 
-#define THREAD_TYPE "cthread"
+static const char metaname[] = "cthread";
+static const char invalid_object[] = "invalid cthread object";
 
 class LuaThread
 {
@@ -33,15 +34,15 @@ public:
 	};
 
 	LuaThread( ) :
+		lua_interface( new Lua::Interface ),
 		thread( 0 ),
 		references( 1 ),
 		state( PENDING )
 	{
-		Lua::Interface *lua_interface = new Lua::Interface;
 
 #if defined _WIN32
 
-		if( ( thread = CreateThread( 0, 0, &LuaThread::Callback, this, 0, 0 ) ) == 0 )
+		if( ( thread = CreateThread( nullptr, 0, &LuaThread::Callback, this, 0, nullptr ) ) == nullptr )
 		{
 			delete lua_interface;
 			throw std::runtime_error( "Unable create new thread!" );
@@ -49,7 +50,7 @@ public:
 
 #elif defined __APPLE__ || defined __linux
 
-		if( pthread_create( &thread, NULL, thread_callback, wrapper ) != 0 )
+		if( pthread_create( &thread, nullptr, thread_callback, wrapper ) != 0 )
 		{
 			delete lua_interface;
 			throw std::runtime_error( "Unable create new thread!" );
@@ -141,7 +142,7 @@ public:
 #endif
 
 	{
-		LuaThread *thread = (LuaThread *)userdata;
+		LuaThread *thread = static_cast<LuaThread *>( userdata );
 		thread->state = RUNNING;
 		thread->Acquire( );
 
@@ -186,10 +187,10 @@ static int thread_create( lua_State *state )
 		return lua.Error( );
 	}
 
-	LuaThread **userdata = (LuaThread **)lua.NewUserdata( sizeof( LuaThread * ) );
+	LuaThread **userdata = lua.NewUserdata<LuaThread *>( sizeof( LuaThread * ) );
 	*userdata = thread;
 
-	lua.NewMetatable( THREAD_TYPE );
+	lua.NewMetatable( metaname );
 	lua.SetMetaTable( -2 );
 
 	return 1;
@@ -198,15 +199,15 @@ static int thread_create( lua_State *state )
 static int thread_destroy( lua_State *state )
 {
 	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckUserdata( 1, metaname );
 
-	LuaThread **userdata = reinterpret_cast<LuaThread **>( lua.ToUserdata( 1 ) );
+	LuaThread **userdata = lua.ToUserdata<LuaThread *>( 1 );
 	LuaThread *thread = *userdata;
-	if( thread == 0 )
-		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
+	if( thread == nullptr )
+		return lua.ArgError( 1, invalid_object );
 
 	thread->Release( );
-	*userdata = 0;
+	*userdata = nullptr;
 
 	return 1;
 }
@@ -237,11 +238,11 @@ static int thread_sleep( lua_State *state )
 static int thread_join( lua_State *state )
 {
 	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckUserdata( 1, metaname );
 
-	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
-	if( thread == 0 )
-		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
+	LuaThread *thread = *lua.ToUserdata<LuaThread *>( 1 );
+	if( thread == nullptr )
+		return lua.ArgError( 1, invalid_object );
 
 	thread->Join( );
 
@@ -251,11 +252,11 @@ static int thread_join( lua_State *state )
 static int thread_detach( lua_State *state )
 {
 	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckUserdata( 1, metaname );
 
-	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
-	if( thread == 0 )
-		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
+	LuaThread *thread = *lua.ToUserdata<LuaThread *>( 1 );
+	if( thread == nullptr )
+		return lua.ArgError( 1, invalid_object );
 
 	thread->Detach( );
 
@@ -265,12 +266,12 @@ static int thread_detach( lua_State *state )
 static int thread_get( lua_State *state )
 {
 	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckUserdata( 1, metaname );
 	lua.CheckAny( 2 );
 
-	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
-	if( thread == 0 )
-		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
+	LuaThread *thread = *lua.ToUserdata<LuaThread *>( 1 );
+	if( thread == nullptr )
+		return lua.ArgError( 1, invalid_object );
 
 
 
@@ -280,13 +281,13 @@ static int thread_get( lua_State *state )
 static int thread_set( lua_State *state )
 {
 	Lua::Interface &lua = GetLuaInterface( state );
-	lua.CheckUserdata( 1, THREAD_TYPE );
+	lua.CheckUserdata( 1, metaname );
 	lua.CheckAny( 2 );
 	lua.CheckAny( 3 );
 
-	LuaThread *thread = *(LuaThread **)lua.ToUserdata( 1 );
-	if( thread == 0 )
-		return lua.ArgError( 1, "invalid " THREAD_TYPE " object" );
+	LuaThread *thread = *lua.ToUserdata<LuaThread *>( 1 );
+	if( thread == nullptr )
+		return lua.ArgError( 1, invalid_object );
 
 
 
@@ -305,7 +306,7 @@ extern "C" int luaopen_thread( lua_State *state )
 	lua.PushFunction( thread_sleep );
 	lua.SetField( -2, "sleep" );
 
-	lua.NewMetatable( THREAD_TYPE );
+	lua.NewMetatable( metaname );
 
 	lua.CreateTable( );	// __metatable value
 

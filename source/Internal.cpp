@@ -2,6 +2,12 @@
 
 #ifdef LUAJIT_VERSION
 
+#ifdef _MSC_VER
+
+#pragma warning( disable : 4201 4127 )
+
+#endif
+
 extern "C"
 {
 	#include <lj_obj.h>

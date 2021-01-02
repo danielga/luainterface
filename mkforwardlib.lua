@@ -221,7 +221,7 @@ local symbols = {
 		--"luaopen_coroutine"
 	},
 
-	["jit"] = {
+	jit = {
 		"",
 		""
 	}

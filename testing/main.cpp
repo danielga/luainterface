@@ -3,6 +3,8 @@
 
 int main( int argc, char **argv )
 {
+	printf( "%i\n", Lua::InterfaceOffset );
+
 	Lua::Interface lua;
 	if( !lua.RunFile( argc < 2 ? "main.lua" : argv[1] ) )
 	{

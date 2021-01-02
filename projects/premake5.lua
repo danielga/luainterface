@@ -15,6 +15,7 @@ newoption({
 
 LUA_API = _OPTIONS["lua-api"]
 if not LUA_API then
+	_OPTIONS["lua-api"] = "lua"
 	LUA_API = "lua"
 end
 
@@ -25,22 +26,21 @@ INCLUDE_FOLDER = "../include"
 THIRDPARTY_FOLDER = "../" .. LUA_FOLDER .. "/src"
 MODULES_FOLDER = "../modules"
 TESTING_FOLDER = "../testing"
-PROJECT_FOLDER = os.get() .. "/" .. _ACTION
+PROJECT_FOLDER = os.target() .. "/" .. _ACTION
+LIBS_FOLDER = "../" .. LUA_FOLDER .. "/build/" .. os.target()
 
 if LUA_API == "lua" then
-	if os.is("windows") then
-		LIBS = {"Lua"}
+	if os.istarget("windows") then
+		LIBS = "Lua"
 	else
 		LIBS = {"Lua", "dl"}
 	end
 elseif LUA_API == "luajit" then
-	if os.is("windows") then
-		LIBS = {"lua51"}
+	if os.istarget("windows") then
+		LIBS = "lua51"
 	else
 		LIBS = {"luajit5.1", "dl"}
 	end
-
-	LIBS_FOLDER = "../" .. LUA_FOLDER .. "/build/" .. os.get()
 end
 
 solution("LuaInterface")
@@ -48,7 +48,8 @@ solution("LuaInterface")
 	language("C++")
 	location(PROJECT_FOLDER)
 	warnings("Extra")
-	flags({"NoPCH", "Unicode"})
+	flags("NoPCH")
+	characterset("MBCS")
 	platforms({"x86", "x64"})
 	configurations({"Release", "Debug", "StaticRelease", "StaticDebug"})
 	startproject("LuaInterface Test")
@@ -73,7 +74,7 @@ solution("LuaInterface")
 
 	filter("configurations:Debug")
 		kind("SharedLib")
-		flags({"Symbols"})
+		symbols("On")
 		objdir(PROJECT_FOLDER .. "/intermediate")
 
 		filter({"configurations:Debug", "platforms:x86"})
@@ -84,12 +85,13 @@ solution("LuaInterface")
 
 	filter("configurations:StaticRelease")
 		kind("StaticLib")
+		defines("LUAINTERFACE_STATIC")
 		optimize("On")
 		vectorextensions("SSE2")
 		objdir(PROJECT_FOLDER .. "/intermediate")
 
 		filter({"configurations:StaticRelease", "options:static-runtime"})
-			flags({"StaticRuntime"})
+			flags("StaticRuntime")
 
 		filter({"configurations:StaticRelease", "platforms:x86"})
 			targetdir(PROJECT_FOLDER .. "/static release x86")
@@ -99,11 +101,12 @@ solution("LuaInterface")
 
 	filter("configurations:StaticDebug")
 		kind("StaticLib")
-		flags({"Symbols"})
+		defines("LUAINTERFACE_STATIC")
+		symbols("On")
 		objdir(PROJECT_FOLDER .. "/intermediate")
 
 		filter({"configurations:StaticDebug", "options:static-runtime"})
-			flags({"StaticRuntime"})
+			flags("StaticRuntime")
 
 		filter({"configurations:StaticDebug", "platforms:x86"})
 			targetdir(PROJECT_FOLDER .. "/static debug x86")
@@ -114,55 +117,84 @@ solution("LuaInterface")
 	project("LuaInterface Test")
 		uuid("0de8c190-5c82-448e-a1b7-504df8282d3a")
 		kind("ConsoleApp")
-		warnings("Extra")
-		includedirs({INCLUDE_FOLDER})
+		includedirs(INCLUDE_FOLDER)
 		files({TESTING_FOLDER .. "/*.cpp", TESTING_FOLDER .. "/*.hpp"})
-		vpaths({["Header files"] = "**.hpp", ["Source files"] = "**.cpp"})
-		links({"LuaInterface"})
+		vpaths({
+			["Header files"] = TESTING_FOLDER .. "/**.hpp",
+			["Source files"] = TESTING_FOLDER .. "/**.cpp"
+		})
+		links("LuaInterface")
 
-		filter("system:not windows")
-			linkoptions({"-Wl,-R,./"})
+		--filter("system:not windows")
+		--	linkoptions("-Wl,-R,./")
 
-			filter({"system:not windows", "configurations:Static*", "platforms:x86"})
-				if LUA_API == "luajit" then
-					libdirs({LIBS_FOLDER .. "/x86/static release"})
-				end
-				links(LIBS)
+		filter("configurations:StaticDebug or StaticRelease")
+			links(LIBS)
 
-			filter({"system:not windows", "configurations:Static*", "platforms:x64"})
-				if LUA_API == "luajit" then
-					libdirs({LIBS_FOLDER .. "/x64/static release"})
-				end
-				links(LIBS)
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x86", "configurations:StaticDebug", "options:static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x86/static debug")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x86", "configurations:StaticDebug", "options:not static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x86/debug")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x86", "configurations:StaticRelease", "options:static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x86/static release")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x86", "configurations:StaticRelease", "options:not static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x86/release")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x64", "configurations:StaticDebug", "options:static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x64/static debug")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x64", "configurations:StaticDebug", "options:not static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x64/debug")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x64", "configurations:StaticRelease", "options:static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x64/static release")
+
+		filter({"system:windows", "options:lua-api=luajit", "platforms:x64", "configurations:StaticRelease", "options:not static-runtime"})
+			libdirs(LIBS_FOLDER .. "/x64/release")
 
 	project("LuaInterface")
 		uuid("41daacfe-a907-46f4-af95-ac52277ba07d")
-		warnings("Extra")
-		defines({"LUAINTERFACE_EXPORT"})
 		includedirs({INCLUDE_FOLDER, THIRDPARTY_FOLDER, SOURCE_FOLDER})
 		files({SOURCE_FOLDER .. "/*.cpp", INCLUDE_FOLDER .. "/*.hpp"})
-		vpaths({["Header files"] = "**.hpp", ["Source files"] = "**.cpp"})
+		vpaths({
+			["Header files"] = INCLUDE_FOLDER .. "/**.hpp",
+			["Source files"] = SOURCE_FOLDER .. "/**.cpp"
+		})
 
-		filter({"configurations:not Static*", "platforms:x86"})
-			if LUA_API == "luajit" then
-				libdirs({LIBS_FOLDER .. "/x86/static release"})
-			end
+		filter("configurations:Debug or Release")
+			defines("LUAINTERFACE_EXPORT")
 			links(LIBS)
 
-		filter({"configurations:not Static*", "platforms:x64"})
-			if LUA_API == "luajit" then
-				libdirs({LIBS_FOLDER .. "/x64/static release"})
-			end
-			links(LIBS)
+		filter({"options:lua-api=luajit", "platforms:x86", "configurations:Debug"})
+			libdirs(LIBS_FOLDER .. "/x86/debug")
+
+		filter({"options:lua-api=luajit", "platforms:x86", "configurations:Release"})
+			libdirs(LIBS_FOLDER .. "/x86/release")
+
+		filter({"options:lua-api=luajit", "platforms:x64", "configurations:Debug"})
+			libdirs(LIBS_FOLDER .. "/x64/debug")
+
+		filter({"options:lua-api=luajit", "platforms:x64", "configurations:Release"})
+			libdirs(LIBS_FOLDER .. "/x64/release")
+
+		filter("options:lua-api=lua")
+			defines("LUA_COMPAT_MODULE")
 
 	if LUA_API == "lua" then
 		project("Lua")
 			uuid("43e3e08c-db0d-4d00-b05b-8bc264c4310f")
 			kind("StaticLib")
-			defines({"LUA_COMPAT_MODULE"})
-			includedirs({THIRDPARTY_FOLDER})
+			compileas("C++")
+			defines("LUA_COMPAT_MODULE")
+			includedirs(THIRDPARTY_FOLDER)
 			files({THIRDPARTY_FOLDER .. "/*.c", THIRDPARTY_FOLDER .. "/*.h"})
-			vpaths({["Header files"] = "**.h", ["Source files"] = "**.c"})
+			vpaths({
+				["Header files"] = THIRDPARTY_FOLDER .. "/**.h",
+				["Source files"] = THIRDPARTY_FOLDER .. "/**.c"
+			})
 	end
 
 	INCLUDE_FOLDER = "../" .. INCLUDE_FOLDER
